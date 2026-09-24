@@ -4,13 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "workspace-launcher"
-version = "0.1.0"
+version = "0.0.1"
 description = "Local Windows application for saving and restoring a desktop workspace."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "pywin32>=306",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [

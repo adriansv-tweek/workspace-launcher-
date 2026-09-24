@@ -1,30 +1,28 @@
 # Workspace Launcher
 
-Workspace Launcher is a local Windows application. Arrange your windows, save that layout as a named workspace, and restore it later.
+Workspace Launcher is a local Windows desktop application. The aim is to let you arrange a workspace the way you want it, save that arrangement as a named profile, and restore it later.
 
-Nothing is sent off the machine. There is no cloud backend.
+Nothing is sent off the machine. There is no cloud backend and no dependency on internal work systems.
 
 ## Status
 
-This is the first functional MVP.
+The project is in the **setup / foundation** phase.
 
-What works:
+What works now:
 
-- capture the current monitors and normal application windows
-- save, restore, update, rename, and delete workspaces
-- launch a missing application from its saved executable path
-- move and resize windows back onto the saved monitor
-- local JSON storage that survives a restart
-- Ctrl+Alt+1 through Ctrl+Alt+9 for the first nine workspaces
-- dark or light appearance, remembered locally
-- optional start when you sign in to Windows
+- a small Python package
+- console startup with logging
+- an editable install so the app can be run the same way from this repository
 
-What is not in this version:
+What is not implemented yet:
 
-- Chrome tab capture or restore
-- changing the shortcut from the menu
-- a system tray, so signing in still opens the window
-- cloud sync or account features
+- workspace capture and restore
+- window, monitor, or process handling
+- Chrome tabs
+- hotkeys
+- saved profiles
+
+Those will be added incrementally after this foundation.
 
 ## Requirements
 
@@ -41,22 +39,23 @@ py -3.12 -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+`".[dev]"` installs the app plus pytest and ruff. Use `python -m pip install -e .` if you only want to run the app.
+
+If activation is blocked by execution policy, call the venv Python directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
 ## Run
+
+With the virtual environment activated:
 
 ```powershell
 python -m workspace_launcher
 ```
 
-1. Open the applications you want and arrange the windows.
-2. Click the large **+** and give the workspace a name.
-3. Move or close some windows.
-4. Open **My Workspaces** from the menu icon and click the workspace.
-
-`Ctrl+Alt+1` restores the first workspace, `Ctrl+Alt+2` the second, and so on, even when another application is in front. A successful restore does not show a dialog. Problems are written to the log.
-
-**Launch at Windows startup** in Settings registers this Python command for the current user. It does not require administrator rights. The window still opens at login; there is no tray icon yet.
-
-Workspaces are stored in `%LOCALAPPDATA%\WorkspaceLauncher\workspaces.json`.
+The same entry point is also installed as `workspace-launcher`.
 
 Optional log level (default `INFO`):
 
@@ -65,7 +64,7 @@ $env:WORKSPACE_LAUNCHER_LOG_LEVEL = "DEBUG"
 python -m workspace_launcher
 ```
 
-Window titles are written at DEBUG. INFO logs application names, displays, and restore results.
+A successful start prints two info lines and exits with code 0. There is no window yet.
 
 ## Checks
 
@@ -75,56 +74,30 @@ python -m ruff check .
 python -m ruff format --check .
 ```
 
-## How a snapshot is stored
-
-A workspace is structured state, not a screenshot:
-
-- monitors: Windows device name, hardware device id, friendly name, bounds, primary flag
-- windows: executable path and name, window class, title, show state (normal, maximized, minimized), and position relative to the monitor
-
-The launcher's own window is not included. Shell, tool, cloaked, and empty windows are skipped.
-
-## Restore
-
-1. Match each saved window to a running window by executable path, then executable name. Title breaks ties when one app has several windows.
-2. If nothing matches and the executable still exists, start that executable once and wait up to 8 seconds for a window.
-3. Place the window on the monitor with the same hardware id. If that monitor is gone, use the monitor that overlaps the old bounds, then the primary monitor.
-4. One failed application does not stop the rest. The restore dialog lists what succeeded and what failed.
-
-## Limitations
-
-- A second window of an app that only keeps one process (Chrome, Teams, and similar) may not open again. The first matching window is moved; further saved windows of that same executable are reported as not restored.
-- Store apps hosted by `ApplicationFrameHost.exe` can be moved if they are already open. They are not launched.
-- Some elevated windows cannot be moved from a non-elevated launcher.
-- Titles change, so matching falls back to "the first unused window of this executable".
-- Monitor numbers (`DISPLAY1`, `DISPLAY2`) are not trusted on their own. Hardware device id is preferred, with a primary-monitor fallback.
-- Hotkeys are fixed to Ctrl+Alt+1–9 in the order workspaces were created. There is no hotkey editor.
-
-## Chrome later
-
-Tab order needs a Chrome extension and native messaging. This MVP only restores the Chrome window through the normal Windows APIs. Keyboard scripting of Chrome is intentionally not used.
-
 ## Layout
 
 ```text
 workspace_launcher/
-  app.py            startup
-  ui.py             capture and workspace list
-  service.py        capture, restore, rename, delete
-  capture.py        read the current desktop
-  restore.py        launch and move windows
-  desktop.py        Win32 monitors, windows, process start
-  matching.py       monitor and window matching rules
-  storage.py        local JSON file
-  hotkeys.py        Ctrl+Alt+1..9
-  models.py         snapshot data
+  app.py             application entry point
+  logging_config.py  console logging
+  __main__.py        python -m workspace_launcher
+tests/
+  test_startup.py
+pyproject.toml
 ```
 
-## Manual check
+New areas (Windows APIs, capture, restore, storage, hotkeys, Chrome) should be added as real modules when the work starts, not as empty placeholders.
 
-1. Put two applications on different monitors.
-2. Capture a workspace named "Test Workspace".
-3. Close one application and move the other.
-4. Restore "Test Workspace".
-5. Quit Workspace Launcher, start it again, and confirm the workspace is still listed.
-6. Update, rename, and delete that workspace.
+## Direction
+
+The likely stack is Python on Windows 11, talking to Windows APIs directly (probably through `pywin32` once window work begins), with local JSON storage at first. Chrome support, if it comes, would be a later extension plus native messaging.
+
+That direction is not locked in. The UI toolkit is also undecided; this phase stays on the console so we do not pick a GUI framework before we need one.
+
+Runtime dependencies are empty on purpose. `pywin32` and a UI library wait until a feature needs them.
+
+## Privacy and security
+
+This foundation does not read your windows, processes, browser, or files, and it does not open network connections.
+
+Later features will see personal workspace details (window titles, paths, maybe tab URLs). That data should stay on this machine. Logging and storage of it should be decided explicitly before those features are built.
